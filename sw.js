@@ -1,15 +1,22 @@
-const CACHE_NAME = 'krishna-quote-cache-v1';
+const CACHE_NAME = 'krishna-quote-cache-v2';
 const FILES_TO_CACHE = [
   './index.html',
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(FILES_TO_CACHE))
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(
+        FILES_TO_CACHE.map((file) =>
+          cache.add(file).catch((err) => console.log('SW cache skip:', file, err))
+        )
+      )
+    )
   );
 });
 
@@ -25,6 +32,7 @@ self.addEventListener('activate', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+  if (event.request.method !== 'GET') return;
   event.respondWith(
     caches.match(event.request).then((cached) => {
       return (
