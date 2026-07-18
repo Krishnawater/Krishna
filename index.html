@@ -176,6 +176,7 @@
     margin: 20px 0;
     color: var(--theme-color);
   }
+  .quote-no-row { margin-top: -15px; }
   .meta-row {
     display: flex;
     justify-content: space-between;
@@ -332,9 +333,62 @@
   body.pdf-compact .header .contact { font-size: 9px !important; margin-top: 1px !important; }
   body.pdf-compact .header { padding-bottom: 5px !important; margin-bottom: 8px !important; }
   body.pdf-compact .quotation-title { margin: 6px 0 !important; font-size: 16px !important; }
+  body.pdf-compact .quote-no-row { margin-top: 0 !important; }
   body.pdf-compact .meta-row { margin-bottom: 8px !important; }
   body.pdf-compact .subject-row { margin-bottom: 6px !important; }
   body.pdf-compact .intro-text { margin-bottom: 8px !important; }
+
+  /* html2canvas (used for WhatsApp/PDF share) does NOT apply @media print rules,
+     so we replicate the essential "clean letter" cleanup here, scoped to
+     body.pdf-compact, and make it win over the mobile @media(max-width:700px)
+     responsive table layout too (hence the extra specificity + !important). */
+  body.pdf-compact .toolbar,
+  body.pdf-compact .history-panel,
+  body.pdf-compact .dashboard-panel,
+  body.pdf-compact .no-print,
+  body.pdf-compact th.no-print,
+  body.pdf-compact td.no-print,
+  body.pdf-compact .row-del {
+    display: none !important;
+  }
+  body.pdf-compact .sheet {
+    box-shadow: none !important;
+    max-width: 100% !important;
+  }
+  body.pdf-compact table#itemsTable,
+  body.pdf-compact table#itemsTable thead,
+  body.pdf-compact table#itemsTable tbody {
+    display: table !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    white-space: normal !important;
+    overflow: visible !important;
+  }
+  body.pdf-compact table#itemsTable thead { display: table-header-group !important; }
+  body.pdf-compact table#itemsTable tr { display: table-row !important; }
+  body.pdf-compact table#itemsTable th,
+  body.pdf-compact table#itemsTable td { display: table-cell !important; }
+  body.pdf-compact input,
+  body.pdf-compact textarea {
+    border: none !important;
+    background: transparent !important;
+    outline: none !important;
+    resize: none !important;
+    color: #000 !important;
+    padding: 0 !important;
+    pointer-events: none !important;
+  }
+  body.pdf-compact textarea {
+    white-space: pre-wrap !important;
+    overflow: visible !important;
+    height: auto !important;
+  }
+  body.pdf-compact tr.category-row td { background: var(--theme-color) !important; }
+  body.pdf-compact tr.category-row input { color: white !important; }
+  body.pdf-compact #quoteDate { display: none !important; }
+  body.pdf-compact .date-print-only { display: inline-block !important; font-size: 14px !important; color: #000 !important; }
+  body.pdf-compact .validity-print-only { display: inline-block !important; }
+  body.pdf-compact .validity-edit { display: none !important; }
 
   @media (max-width: 700px) {
     body { padding: 8px; }
@@ -412,14 +466,14 @@
   <button class="btn-customers" onclick="toggleCustomerPanel()">👥 Customers (<span id="custCount">0</span>)</button>
   <button class="btn-followup" onclick="toggleFollowupPanel()">🔔 Follow-ups (<span id="followupCount">0</span>)</button>
   <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+  <button class="btn-print" onclick="downloadPDF(event)">📄 Generate PDF</button>
+  <button class="btn-whatsapp" onclick="shareWhatsApp(event)">💬 Share WhatsApp</button>
   <input type="text" id="staffName" placeholder="Your name (staff)" style="padding:8px 10px; border-radius:6px; border:none; font-size:13px; width:150px;" onchange="saveStaffName()">
   <select id="userRole" onchange="handleRoleChange()" title="Current access role" style="padding:8px 10px; border-radius:6px; border:none; font-weight:600; cursor:pointer;">
     <option value="Staff">👤 Staff</option>
     <option value="Admin">🔑 Admin</option>
   </select>
   <button class="btn-reset" onclick="changeAdminPin()" title="Change Admin PIN (Admin only)">🔐 Change PIN</button>
-  <button class="btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
-  <button class="btn-whatsapp" onclick="shareWhatsApp(event)">📲 Share via WhatsApp</button>
   <button id="installBtn" class="btn-print" style="display:none;" onclick="installApp()">⬇ Install App</button>
   <select id="themeSelect" onchange="applyTheme(this.value)" style="padding:8px 10px; border-radius:6px; border:none; font-weight:600; cursor:pointer;">
     <option value="blue">🔵 Blue Theme</option>
@@ -472,7 +526,7 @@
   </div>
 
   <div class="quotation-title">QUOTATION</div>
-  <div style="text-align:center; font-size:13px; color:#555; margin-top:-15px; margin-bottom:15px;">
+  <div class="quote-no-row" style="text-align:center; font-size:13px; color:#555; margin-bottom:15px;">
     Quotation No: <input type="text" id="quoteNumber" style="border:none; background:transparent; font-weight:600; text-align:center; width:150px; color:#555;" value="">
     <button class="no-print" onclick="generateNewNumber()" style="margin-left:8px; padding:3px 8px; font-size:11px; border:none; border-radius:4px; background:#ddd; cursor:pointer;">🔄 New No.</button>
   </div>
@@ -587,7 +641,7 @@ function makeRow(desc, qty, unit, rate, gst) {
   const tr = document.createElement('tr');
   tr.innerHTML = `
     <td class="center rownum">${rowCount}</td>
-    <td><input type="text" class="desc" value="${desc||''}" placeholder="Item description" list="itemHistoryList" onchange="autofillRate(this)"></td>
+    <td><input type="text" class="desc" value="${desc||''}" placeholder="Item description" onchange="autofillRate(this)" autocomplete="off"></td>
     <td><input type="number" class="qty" value="${qty!==undefined?qty:1}" min="0" step="any" oninput="calcRow(this)"></td>
     <td><input type="text" class="unit" value="${unit||''}" placeholder="e.g. Ltr, Nos"></td>
     <td><input type="number" class="rate" value="${rate!==undefined?rate:0}" min="0" step="any" oninput="calcRow(this)"></td>
@@ -993,37 +1047,125 @@ function duplicateQuotation() {
   alert('Duplicated with a new quotation number. Edit customer name, date, or items as needed, then Save again.');
 }
 
-async function shareWhatsApp(evt) {
-  const btn = evt.target;
-  const originalText = btn.textContent;
-  btn.textContent = '⏳ Preparing PDF...';
-  btn.disabled = true;
-
+// Builds the quotation PDF and returns { pdf, pdfBlob, pdfFile, fileName }.
+// Shared by the "Generate PDF" and "Share WhatsApp" buttons so the
+// html2canvas/jsPDF logic only lives in one place.
+async function buildQuotationPDF() {
   document.body.classList.add('pdf-compact');
   try {
     const sheet = document.getElementById('sheet');
     await new Promise(r => setTimeout(r, 50));
-    const canvas = await html2canvas(sheet, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+
+    // Record every table row's top/bottom position (relative to the sheet) BEFORE
+    // rasterizing, so we can later make sure no page-break line falls in the middle
+    // of a row (this is what was causing rows to look "cut in half" in the PDF).
+    const sheetRectPre = sheet.getBoundingClientRect();
+    const rowBoundaries = Array.from(sheet.querySelectorAll('table tr')).map(el => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top - sheetRectPre.top, bottom: r.bottom - sheetRectPre.top };
+    });
+    const sheetWidthPx = sheetRectPre.width;
+
+    const canvas = await html2canvas(sheet, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      windowWidth: 1024, // Added to fix mobile table shrinking issue
+      // html2canvas clones the whole document to rasterize it, and cloneNode()
+      // only copies the *attribute* value of <input>/<textarea> elements, not
+      // their live, currently-typed .value property. That's what was causing
+      // Description/Qty/Unit/Rate/GST (and anything else typed after page
+      // load) to render blank in the exported PDF even though the totals
+      // calculated from those same values were correct. Fix: walk the
+      // original and cloned elements in the same DOM order and replace each
+      // cloned form control with a plain text element holding the real value.
+      onclone: (clonedDoc, clonedSheet) => {
+        const originals = sheet.querySelectorAll('input, textarea');
+        const clones = clonedSheet.querySelectorAll('input, textarea');
+        originals.forEach((orig, i) => {
+          const clone = clones[i];
+          if (!clone || !clone.parentNode) return;
+          const cs = window.getComputedStyle(orig);
+          const isTextarea = orig.tagName === 'TEXTAREA';
+          const span = clonedDoc.createElement(isTextarea ? 'div' : 'span');
+          span.textContent = orig.value;
+          span.style.cssText =
+            'display:' + (isTextarea ? 'block' : 'inline-block') + ';' +
+            'width: 100%;' + // Changed from fixed offsetWidth to 100%
+            'min-height:' + orig.offsetHeight + 'px;' +
+            'font-size:' + cs.fontSize + ';' +
+            'font-family:' + cs.fontFamily + ';' +
+            'font-weight:' + cs.fontWeight + ';' +
+            'line-height:' + cs.lineHeight + ';' +
+            'color:' + cs.color + ';' +
+            'text-align:' + cs.textAlign + ';' +
+            'white-space: normal;' + // Changed from nowrap to normal
+            'word-break: break-word;' + // Added to prevent overflow
+            'vertical-align:middle;' +
+            'box-sizing:border-box;' +
+            'padding:' + cs.padding + ';';
+          clone.parentNode.replaceChild(span, clone);
+        });
+        // Strip anything on-screen-only (delete-row ✖ buttons, add-row
+        // buttons, etc.) from the clone so it never shows up in the PDF.
+        clonedSheet.querySelectorAll('.no-print, .row-del').forEach(el => el.remove());
+      }
+    });
+    const pxScale = canvas.width / sheetWidthPx; // canvas pixels per CSS pixel
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
-    const imgWidth = pageWidth;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+    const pageWidthMm = pdf.internal.pageSize.getWidth();
+    const pageHeightMm = pdf.internal.pageSize.getHeight();
+    const mmPerCanvasPx = pageWidthMm / canvas.width;
+    const pageHeightCanvasPx = pageHeightMm / mmPerCanvasPx;
 
-    let heightLeft = imgHeight;
-    let position = 0;
+    // Given an ideal break point, nudge it up (never down, so nothing overlaps)
+    // to just above any row it would otherwise slice through.
+    function findSafeBreak(idealBreakPx, prevBreakPx) {
+      let safe = idealBreakPx;
+      for (const rb of rowBoundaries) {
+        const topPx = rb.top * pxScale;
+        const bottomPx = rb.bottom * pxScale;
+        if (topPx < safe && bottomPx > safe && topPx > prevBreakPx) {
+          safe = topPx;
+        }
+      }
+      return safe;
+    }
 
-    pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-    heightLeft -= pageHeight;
+    // Compute break points for every page so each page ends in a gap between rows.
+    const breaks = [0];
+    let cursor = 0;
+    while (cursor < canvas.height - 1) {
+      let next = Math.min(cursor + pageHeightCanvasPx, canvas.height);
+      if (next < canvas.height) next = findSafeBreak(next, cursor);
+      if (next <= cursor) next = Math.min(cursor + pageHeightCanvasPx, canvas.height); // safety fallback
+      breaks.push(next);
+      cursor = next;
+    }
 
-    while (heightLeft > 0) {
-      position = heightLeft - imgHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+    // Slice the big canvas into per-page canvases using the safe break points,
+    // so every page gets a clean, un-split image instead of one long image
+    // repositioned with a negative offset (which is what caused the cut rows).
+    for (let i = 0; i < breaks.length - 1; i++) {
+      const startPx = breaks[i];
+      const endPx = breaks[i + 1];
+      const sliceHeightPx = Math.round(endPx - startPx);
+      if (sliceHeightPx <= 0) continue;
+
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = canvas.width;
+      pageCanvas.height = sliceHeightPx;
+      const ctx = pageCanvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+      ctx.drawImage(canvas, 0, startPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+      const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.95);
+
+      if (i > 0) pdf.addPage();
+      const sliceHeightMm = sliceHeightPx * mmPerCanvasPx;
+      pdf.addImage(pageImgData, 'JPEG', 0, 0, pageWidthMm, sliceHeightMm);
     }
 
     const custName = (document.getElementById('toName').value || 'Quotation').replace(/[^a-z0-9]/gi, '_');
@@ -1031,26 +1173,82 @@ async function shareWhatsApp(evt) {
     const pdfBlob = pdf.output('blob');
     const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
+    return { pdf, pdfBlob, pdfFile, fileName };
+  } finally {
+    document.body.classList.remove('pdf-compact');
+  }
+}
+
+// "📄 Generate PDF" button — just builds and downloads the PDF. No sharing.
+async function downloadPDF(evt) {
+  const btn = evt.target;
+  const originalText = btn.textContent;
+  btn.textContent = '⏳ Preparing PDF...';
+  btn.disabled = true;
+  try {
+    const { pdf, fileName } = await buildQuotationPDF();
+    pdf.save(fileName);
+  } catch (err) {
+    alert('Could not generate PDF: ' + err.message);
+  } finally {
+    btn.textContent = originalText;
+    btn.disabled = false;
+  }
+}
+
+// "💬 Share WhatsApp" button — builds the PDF and sends it to the customer's
+// WhatsApp number typed in the quotation's "Phone" field.
+//
+// Real limit to know: WhatsApp's wa.me links can only pre-fill TEXT, never a
+// file — no website can auto-attach a file to a specific WhatsApp number,
+// that control belongs to WhatsApp/the phone OS, not to this app. The closest
+// possible flow (what this does):
+//   1. On phones (Android/iOS, Chrome/Safari) the Web Share API can share the
+//      PDF file directly — this pops the phone's native share sheet already
+//      filtered to file-capable apps. Tap WhatsApp, tap the customer's chat.
+//   2. Right after, this also opens that exact customer's WhatsApp chat
+//      (wa.me/<number>) so it's already on screen — if step 1 isn't
+//      available (e.g. desktop Chrome), the PDF is downloaded instead and the
+//      user just taps 📎 inside that open chat to attach it from Downloads.
+async function shareWhatsApp(evt) {
+  const btn = evt.target;
+  const originalText = btn.textContent;
+  btn.textContent = '⏳ Preparing PDF...';
+  btn.disabled = true;
+
+  try {
+    let phone = (document.getElementById('toPhone').value || '').replace(/\D/g, '');
+    if (phone && phone.length === 10) phone = '91' + phone;
+    if (!phone) {
+      alert('⚠️ Customer phone number ("Phone" field) இல்ல. முதல்ல அந்த field-ல் customer WhatsApp number type பண்ணுங்க.');
+      return;
+    }
+
+    const { pdf, pdfFile, fileName } = await buildQuotationPDF();
+
     if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       await navigator.share({
         files: [pdfFile],
         title: 'Quotation - ' + (document.getElementById('toName').value || ''),
         text: 'Quotation from Krishna Industrial Services'
       });
+      // Also open the customer's chat, in case the share sheet chosen wasn't WhatsApp.
+      window.open(`https://wa.me/${phone}`, '_blank');
     } else {
-      // Fallback: download the PDF and open WhatsApp so user can attach it manually
+      // Desktop / unsupported browser fallback: download the PDF and open the
+      // exact customer chat so the user only has to tap 📎 and pick the file.
       pdf.save(fileName);
-      let phone = (document.getElementById('toPhone').value || '').replace(/\D/g, '');
-      if (phone && phone.length === 10) phone = '91' + phone;
-      const msg = encodeURIComponent('Quotation PDF downloaded as "' + fileName + '" — please attach it here from your Downloads folder.');
-      const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-      alert('PDF downloaded as "' + fileName + '". WhatsApp is opening now — please attach the downloaded PDF from your Downloads/Files.');
-      window.open(url, '_blank');
+      const msg = encodeURIComponent('Quotation PDF downloaded as "' + fileName + '" — please attach it here (tap 📎 > Document) from your Downloads folder.');
+      alert('PDF downloaded as "' + fileName + '". ' + phone + ' WhatsApp chat open aagudhu — 📎 attach icon-ஐ tap பண்ணி downloaded PDF-ஐ select பண்ணுங்க.');
+      window.open(`https://wa.me/${phone}?text=${msg}`, '_blank');
     }
   } catch (err) {
-    alert('Could not generate PDF for sharing: ' + err.message);
+    if (err && err.name === 'AbortError') {
+      // User closed the native share sheet — not a real error, stay silent.
+    } else {
+      alert('Could not generate PDF for sharing: ' + err.message);
+    }
   } finally {
-    document.body.classList.remove('pdf-compact');
     btn.textContent = originalText;
     btn.disabled = false;
   }
@@ -2228,11 +2426,10 @@ function commitRateHistory() {
   refreshItemHistoryList();
 }
 
-function refreshItemHistoryList() {
+// Merge master stock list with previously-quoted items (history labels shown
+// first, since those already have a known rate that can auto-fill).
+function getMergedProductOptions() {
   const history = getRateHistory();
-  const dl = document.getElementById('itemHistoryList');
-  // Merge master stock list with previously-quoted items (history labels shown first,
-  // since those already have a known rate that can auto-fill).
   const seen = new Set();
   const options = [];
 
@@ -2252,8 +2449,106 @@ function refreshItemHistoryList() {
     }
   });
 
+  return options;
+}
+
+function refreshItemHistoryList() {
+  const dl = document.getElementById('itemHistoryList');
+  const options = getMergedProductOptions();
   dl.innerHTML = options.map(name => `<option value="${name.replace(/"/g, '&quot;')}">`).join('');
 }
+
+// ---------- Custom cross-device autocomplete for item description ----------
+// The native <datalist> dropdown is NOT supported on iOS Safari at all, and is
+// inconsistent on some Android browsers, so we build our own suggestion popup
+// that works the same way on every device/browser.
+let acBox = null;
+let acMatches = [];
+let acActiveInput = null;
+
+function ensureAcBox() {
+  if (acBox) return acBox;
+  acBox = document.createElement('div');
+  acBox.id = 'descAutocompleteBox';
+  acBox.style.cssText = 'position:absolute; z-index:9999; background:#fff; border:1px solid #ccc; ' +
+    'border-radius:6px; box-shadow:0 4px 14px rgba(0,0,0,0.18); max-height:220px; overflow-y:auto; ' +
+    'font-size:13px; display:none; -webkit-overflow-scrolling:touch;';
+  document.body.appendChild(acBox);
+  return acBox;
+}
+
+function positionAcBox(input) {
+  const box = ensureAcBox();
+  const rect = input.getBoundingClientRect();
+  box.style.left = (rect.left + window.scrollX) + 'px';
+  box.style.top = (rect.bottom + window.scrollY + 2) + 'px';
+  box.style.width = Math.max(rect.width, 220) + 'px';
+}
+
+function showDescSuggestions(input) {
+  const query = input.value.trim().toLowerCase();
+  if (!query) { hideDescSuggestions(); return; }
+
+  const all = getMergedProductOptions();
+  acMatches = all.filter(n => n.toLowerCase().includes(query)).slice(0, 8);
+  if (acMatches.length === 0) { hideDescSuggestions(); return; }
+
+  const box = ensureAcBox();
+  box.innerHTML = acMatches.map(name =>
+    `<div class="ac-item" style="padding:9px 10px; cursor:pointer; border-bottom:1px solid #f0f0f0;">${name.replace(/</g, '&lt;')}</div>`
+  ).join('');
+  positionAcBox(input);
+  box.style.display = 'block';
+  acActiveInput = input;
+
+  Array.from(box.querySelectorAll('.ac-item')).forEach((el, i) => {
+    el.addEventListener('mouseenter', () => { el.style.background = '#f2f7f7'; });
+    el.addEventListener('mouseleave', () => { el.style.background = '#fff'; });
+    // mousedown (not click) fires before the input's blur, so the value still applies
+    el.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      input.value = acMatches[i];
+      hideDescSuggestions();
+      autofillRate(input);
+    });
+    el.addEventListener('touchend', (e) => {
+      e.preventDefault();
+      input.value = acMatches[i];
+      hideDescSuggestions();
+      autofillRate(input);
+    });
+  });
+}
+
+function hideDescSuggestions() {
+  if (acBox) acBox.style.display = 'none';
+  acActiveInput = null;
+}
+
+document.addEventListener('input', (e) => {
+  if (e.target.classList && e.target.classList.contains('desc')) {
+    showDescSuggestions(e.target);
+  }
+});
+document.addEventListener('focusin', (e) => {
+  if (e.target.classList && e.target.classList.contains('desc') && e.target.value.trim()) {
+    showDescSuggestions(e.target);
+  }
+});
+document.addEventListener('focusout', (e) => {
+  if (e.target.classList && e.target.classList.contains('desc')) {
+    // Slight delay so a tap on a suggestion (mousedown/touchend above) registers first
+    setTimeout(hideDescSuggestions, 150);
+  }
+});
+document.addEventListener('click', (e) => {
+  if (acBox && acBox.style.display === 'block' && !acBox.contains(e.target) &&
+      !(e.target.classList && e.target.classList.contains('desc'))) {
+    hideDescSuggestions();
+  }
+});
+window.addEventListener('resize', hideDescSuggestions);
+window.addEventListener('scroll', () => { if (acActiveInput) positionAcBox(acActiveInput); }, true);
 
 // ---------- Customer Database ----------
 const CUSTOMER_DB_KEY = 'krishna_customers';
@@ -2611,9 +2906,6 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 's' || e.key === 'S') {
     e.preventDefault();
     saveQuotation();
-  } else if (e.key === 'p' || e.key === 'P') {
-    e.preventDefault();
-    window.print();
   } else if (e.key === 'n' || e.key === 'N') {
     e.preventDefault();
     resetForm();
