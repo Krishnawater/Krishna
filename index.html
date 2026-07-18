@@ -1089,8 +1089,13 @@ async function shareWhatsApp(evt) {
           const clone = clones[i];
           if (!clone || !clone.parentNode) return;
           
-          // Value காலியாக இருந்தால், Placeholder-ஐ எடுத்துக்கொள்ளும்
-          const val = orig.value || orig.placeholder || '';
+          // Date மற்றும் Validity பாக்ஸ்களை Text ஆக மாற்றக்கூடாது (அவை CSS மூலம் மறைக்கப்பட்டு print-only text காண்பிக்கப்படும்)
+          if (orig.id === 'quoteDate' || orig.id === 'validityDays') {
+            return;
+          }
+          
+          // Placeholder-ஐ பயன்படுத்தக் கூடாது. Type செய்த Value இருந்தால் மட்டும் எடுக்கவும், இல்லையென்றால் Blank ஆக விடவும்.
+          const val = orig.value || ''; 
           const cs = window.getComputedStyle(orig);
           
           if (orig.tagName === 'TEXTAREA') {
@@ -1099,10 +1104,10 @@ async function shareWhatsApp(evt) {
             div.style.cssText = `white-space: pre-wrap; font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; padding: 0; line-height: ${cs.lineHeight};`;
             clone.parentNode.replaceChild(div, clone);
           } else {
-            // Input-ஐ சாதாரண Text (Span) ஆக மாற்றுதல் - இது எழுத்துக்கள் வெட்டப்படுவதைத் தடுக்கும்
             const span = clonedDoc.createElement('span');
             span.textContent = val;
-            span.style.cssText = `font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; white-space: normal; word-break: break-word;`;
+            // காலியாக இருந்தாலும் டேபிள் கட்டமைப்பு (Cell structure) கலையாமல் இருக்க min-height சேர்க்கப்பட்டுள்ளது
+            span.style.cssText = `font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; white-space: normal; word-break: break-word; display: inline-block; width: 100%; min-height: 1em;`;
             clone.parentNode.replaceChild(span, clone);
           }
         });
@@ -1186,7 +1191,6 @@ async function shareWhatsApp(evt) {
   } finally {
     document.body.classList.remove('pdf-compact');
     
-    // --- RESTORE ORIGINAL MOBILE VIEW ---
     document.body.style.width = origBodyWidth;
     sheet.style.width = origSheetWidth;
     sheet.style.maxWidth = origSheetMaxWidth;
