@@ -1065,11 +1065,10 @@ async function shareWhatsApp(evt) {
   sheet.style.setProperty('padding', '40px', 'important');
   
   try {
-    if (table) table.scrollLeft = 0; // avoid capturing a horizontally-scrolled table on mobile
+    if (table) table.scrollLeft = 0;
     window.scrollTo(0, 0);
     await new Promise(r => setTimeout(r, 150));
 
-    // Record every table row's top/bottom position
     const sheetRectPre = sheet.getBoundingClientRect();
     const rowBoundaries = Array.from(sheet.querySelectorAll('table tr')).map(el => {
       const r = el.getBoundingClientRect();
@@ -1090,14 +1089,21 @@ async function shareWhatsApp(evt) {
           const clone = clones[i];
           if (!clone || !clone.parentNode) return;
           
+          // Value காலியாக இருந்தால், Placeholder-ஐ எடுத்துக்கொள்ளும்
+          const val = orig.value || orig.placeholder || '';
+          const cs = window.getComputedStyle(orig);
+          
           if (orig.tagName === 'TEXTAREA') {
             const div = clonedDoc.createElement('div');
-            div.textContent = orig.value;
-            const cs = window.getComputedStyle(orig);
+            div.textContent = val;
             div.style.cssText = `white-space: pre-wrap; font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; padding: 0; line-height: ${cs.lineHeight};`;
             clone.parentNode.replaceChild(div, clone);
           } else {
-            clone.setAttribute('value', orig.value);
+            // Input-ஐ சாதாரண Text (Span) ஆக மாற்றுதல் - இது எழுத்துக்கள் வெட்டப்படுவதைத் தடுக்கும்
+            const span = clonedDoc.createElement('span');
+            span.textContent = val;
+            span.style.cssText = `font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; white-space: normal; word-break: break-word;`;
+            clone.parentNode.replaceChild(span, clone);
           }
         });
         
@@ -1106,7 +1112,6 @@ async function shareWhatsApp(evt) {
     });
     
     const pxScale = canvas.width / sheetWidthPx;
-
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidthMm = pdf.internal.pageSize.getWidth();
@@ -1168,7 +1173,6 @@ async function shareWhatsApp(evt) {
         text: 'Quotation from Krishna Industrial Services'
       });
     } else {
-      // Fallback: download the PDF and open WhatsApp so user can attach it manually
       pdf.save(fileName);
       let phone = (document.getElementById('toPhone').value || '').replace(/\D/g, '');
       if (phone && phone.length === 10) phone = '91' + phone;
