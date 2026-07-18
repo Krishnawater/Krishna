@@ -404,6 +404,7 @@
     body { background: white; padding: 0; margin: 0; }
     .toolbar { display: none; }
     .history-panel { display: none !important; }
+    .dashboard-panel { display: none !important; }
     .sheet { box-shadow: none; padding: 0; max-width: 100%; }
     .row-del { display: none; }
     .no-print, th.no-print, td.no-print { display: none !important; }
@@ -416,8 +417,11 @@
     .header { page-break-after: avoid; }
     .quotation-title, .meta-row, .subject-row, .intro-text { page-break-inside: avoid; }
     .signature { page-break-inside: avoid; }
-    .footer-block { page-break-inside: avoid !important; break-inside: avoid !important; }
+    
+    /* FIX 1: பக்கம் இரண்டாக உடைவதைத் தடுத்து, இடைவெளியை சரிசெய்ய */
+    .footer-block { page-break-inside: auto !important; break-inside: auto !important; display: block; }
     .summary-table { page-break-inside: avoid !important; }
+    
     p { orphans: 3; widows: 3; }
 
     input, textarea {
@@ -429,14 +433,20 @@
       padding: 0 !important;
       pointer-events: none;
     }
-    input:focus, textarea:focus { background: transparent !important; outline: none !important; }
+    
+    /* FIX 2: காலியாக உள்ள பாக்ஸ்களில் "e.g. Ltr" போன்ற வழிகாட்டிகள் PDF-ல் வருவதை மறைக்க */
+    input::placeholder, textarea::placeholder { color: transparent !important; }
+    
     textarea {
       white-space: pre-wrap;
       overflow: visible;
       height: auto !important;
       font-family: inherit;
     }
-    #quoteDate { display: none !important; }
+    
+    /* FIX 3: தேதி இரண்டு முறை வருவதை நிரந்தரமாகத் தடுக்க */
+    input[type="date"], #quoteDate, #validityDays { display: none !important; }
+    
     .date-print-only { display: inline-block !important; font-size: 14px; color: #000; }
     .validity-print-only { display: inline-block !important; }
     .validity-edit { display: none !important; }
