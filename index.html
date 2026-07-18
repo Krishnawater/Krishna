@@ -400,16 +400,23 @@
     .history-panel, .sheet, .dashboard-panel { max-width: 100%; }
   }
 
-  @media print {
+ @media print {
     body { background: white; padding: 0; margin: 0; }
-    .toolbar { display: none; }
-    .history-panel { display: none !important; }
-    .dashboard-panel { display: none !important; }
-    .sheet { box-shadow: none; padding: 0; max-width: 100%; }
-    .row-del { display: none; }
-    .no-print, th.no-print, td.no-print { display: none !important; }
+    .toolbar, .history-panel, .dashboard-panel { display: none !important; }
+    .sheet { box-shadow: none; padding: 0; max-width: 100%; width: 100% !important; }
+    .row-del, .no-print, th.no-print, td.no-print { display: none !important; }
 
-    table { page-break-inside: auto; }
+    /* MAGIC FIX: டேபிளுக்குக் கீழே பெரிய இடைவெளி வருவதைத் தடுக்கும் குறியீடு */
+    table#itemsTable { 
+      display: table !important; 
+      overflow: visible !important; 
+      white-space: normal !important; 
+      width: 100% !important; 
+    }
+    table#itemsTable thead { display: table-header-group !important; width: auto !important; }
+    table#itemsTable tbody { display: table-row-group !important; width: auto !important; }
+
+    table { page-break-inside: auto; border-collapse: collapse; }
     thead { display: table-header-group; }
     tfoot { display: table-footer-group; }
     tr { page-break-inside: avoid; page-break-after: auto; }
@@ -418,8 +425,8 @@
     .quotation-title, .meta-row, .subject-row, .intro-text { page-break-inside: avoid; }
     .signature { page-break-inside: avoid; }
     
-    /* FIX 1: பக்கம் இரண்டாக உடைவதைத் தடுத்து, இடைவெளியை சரிசெய்ய */
-    .footer-block { page-break-inside: auto !important; break-inside: auto !important; display: block; }
+    /* Footer பகுதியை சரியாக முதல் பக்கத்திலேயே டேபிளுக்குக் கீழே கொண்டுவர */
+    .footer-block { page-break-inside: avoid !important; break-inside: avoid !important; margin-top: 15px; display: block; }
     .summary-table { page-break-inside: avoid !important; }
     
     p { orphans: 3; widows: 3; }
@@ -434,7 +441,6 @@
       pointer-events: none;
     }
     
-    /* FIX 2: காலியாக உள்ள பாக்ஸ்களில் "e.g. Ltr" போன்ற வழிகாட்டிகள் PDF-ல் வருவதை மறைக்க */
     input::placeholder, textarea::placeholder { color: transparent !important; }
     
     textarea {
@@ -444,7 +450,6 @@
       font-family: inherit;
     }
     
-    /* FIX 3: தேதி இரண்டு முறை வருவதை நிரந்தரமாகத் தடுக்க */
     input[type="date"], #quoteDate, #validityDays { display: none !important; }
     
     .date-print-only { display: inline-block !important; font-size: 14px; color: #000; }
@@ -453,7 +458,7 @@
     #tableTitle { font-weight: 600 !important; }
     #subject { font-weight: bold !important; }
     .summary-table .sval input { border: none !important; }
-    tr.category-row td { background: var(--theme-color) !important; }
+    tr.category-row td { background: var(--theme-color) !important; color: white !important; }
     tr.category-row input { color: white !important; }
   }
 </style>
