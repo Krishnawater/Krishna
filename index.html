@@ -1092,12 +1092,12 @@ async function shareWhatsApp(evt) {
           const clone = clones[i];
           if (!clone || !clone.parentNode) return;
           
-          // Date மற்றும் Validity பாக்ஸ்களை Text ஆக மாற்றக்கூடாது (அவை CSS மூலம் மறைக்கப்பட்டு print-only text காண்பிக்கப்படும்)
+          // Date மற்றும் Validity பாக்ஸ்களை Text ஆக மாற்றக்கூடாது
           if (orig.id === 'quoteDate' || orig.id === 'validityDays') {
             return;
           }
           
-          // Placeholder-ஐ பயன்படுத்தக் கூடாது. Type செய்த Value இருந்தால் மட்டும் எடுக்கவும், இல்லையென்றால் Blank ஆக விடவும்.
+          // Placeholder-ஐ பயன்படுத்தக் கூடாது. Type செய்த Value இருந்தால் மட்டும் எடுக்கவும்.
           const val = orig.value || ''; 
           const cs = window.getComputedStyle(orig);
           
@@ -1109,7 +1109,6 @@ async function shareWhatsApp(evt) {
           } else {
             const span = clonedDoc.createElement('span');
             span.textContent = val;
-            // காலியாக இருந்தாலும் டேபிள் கட்டமைப்பு (Cell structure) கலையாமல் இருக்க min-height சேர்க்கப்பட்டுள்ளது
             span.style.cssText = `font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; white-space: normal; word-break: break-word; display: inline-block; width: 100%; min-height: 1em;`;
             clone.parentNode.replaceChild(span, clone);
           }
@@ -1174,6 +1173,7 @@ async function shareWhatsApp(evt) {
     const pdfBlob = pdf.output('blob');
     const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
+    // WhatsApp Integration Logic
     if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       await navigator.share({
         files: [pdfFile],
@@ -1186,7 +1186,7 @@ async function shareWhatsApp(evt) {
       if (phone && phone.length === 10) phone = '91' + phone;
       const msg = encodeURIComponent('Quotation PDF downloaded as "' + fileName + '" — please attach it here from your Downloads folder.');
       const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-      alert('PDF downloaded as "' + fileName + '". WhatsApp is opening now — please attach the downloaded PDF from your Downloads/Files.');
+      alert('PDF டவுன்லோட் ஆகிவிட்டது. இப்போது வாட்ஸ்அப் திறக்கப்படும். 📎 பட்டனை அழுத்தி, "Documents" என்பதற்குச் சென்று, இப்போது டவுன்லோட் ஆன PDF-ஐத் தேர்வு செய்து அனுப்புங்கள்.');
       window.open(url, '_blank');
     }
   } catch (err) {
