@@ -1051,6 +1051,7 @@ function duplicateQuotation() {
 // Shared by the "Generate PDF" and "Share WhatsApp" buttons so the
 // html2canvas/jsPDF logic only lives in one place.
 // Builds the quotation PDF and returns { pdf, pdfBlob, pdfFile, fileName }.
+// Builds the quotation PDF and returns { pdf, pdfBlob, pdfFile, fileName }.
 async function buildQuotationPDF() {
   document.body.classList.add('pdf-compact');
   try {
@@ -1069,37 +1070,30 @@ async function buildQuotationPDF() {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
-      windowWidth: 1024, // Fixes mobile table shrinking
+      windowWidth: 1024, // Fixes mobile view shrinking
       onclone: (clonedDoc, clonedSheet) => {
         const originals = sheet.querySelectorAll('input, textarea');
         const clones = clonedSheet.querySelectorAll('input, textarea');
+        
         originals.forEach((orig, i) => {
           const clone = clones[i];
           if (!clone || !clone.parentNode) return;
-          const cs = window.getComputedStyle(orig);
           
-          // Changed to 'div' instead of 'span' to avoid table baseline breaking
-          const divElement = clonedDoc.createElement('div');
-          divElement.textContent = orig.value;
-          
-          divElement.style.cssText =
-            'display: block;' + // Forced block layout for perfect table cell fit
-            'width: 100%;' +
-            'font-size:' + cs.fontSize + ';' +
-            'font-family:' + cs.fontFamily + ';' +
-            'font-weight:' + cs.fontWeight + ';' +
-            'line-height:' + cs.lineHeight + ';' +
-            'color:' + cs.color + ';' +
-            'text-align:' + cs.textAlign + ';' +
-            'white-space: pre-wrap;' + // Preserves spaces and wraps text properly
-            'word-wrap: break-word;' + 
-            'box-sizing: border-box;' +
-            'padding:' + cs.padding + ';';
-            
-          clone.parentNode.replaceChild(divElement, clone);
+          if (orig.tagName === 'TEXTAREA') {
+            // Textarea-வுக்கு மட்டும் div ஆக மாற்றுகிறோம் (அப்போதுதான் பல வரிகள் கச்சிதமாக வரும்)
+            const div = clonedDoc.createElement('div');
+            div.textContent = orig.value;
+            const cs = window.getComputedStyle(orig);
+            div.style.cssText = `white-space: pre-wrap; font-size: ${cs.fontSize}; font-family: ${cs.fontFamily}; font-weight: ${cs.fontWeight}; color: #000; padding: 0; line-height: ${cs.lineHeight};`;
+            clone.parentNode.replaceChild(div, clone);
+          } else {
+            // Input பாக்ஸ்களை (Description, Qty, Rate) மாற்றாமல், அதன் 'value' ஐ மட்டும் அப்டேட் செய்கிறோம்.
+            // இது ஒரிஜினல் டேபிள் அலைன்மெண்ட்டை 100% அப்படியே PDF-ல் கொண்டுவரும்!
+            clone.setAttribute('value', orig.value);
+          }
         });
         
-        // Remove on-screen only elements
+        // Remove on-screen only elements (Buttons, Delete icons)
         clonedSheet.querySelectorAll('.no-print, .row-del').forEach(el => el.remove());
       }
     });
