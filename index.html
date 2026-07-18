@@ -1056,7 +1056,6 @@ async function shareWhatsApp(evt) {
   const sheet = document.getElementById('sheet');
   const table = document.getElementById('itemsTable');
   
-  // --- MOBILE FIX: Force Desktop Dimensions Before Snapshot ---
   const origBodyWidth = document.body.style.width;
   const origSheetWidth = sheet.style.width;
   const origSheetMaxWidth = sheet.style.maxWidth;
@@ -1091,13 +1090,8 @@ async function shareWhatsApp(evt) {
         originals.forEach((orig, i) => {
           const clone = clones[i];
           if (!clone || !clone.parentNode) return;
+          if (orig.id === 'quoteDate' || orig.id === 'validityDays') return;
           
-          // Date மற்றும் Validity பாக்ஸ்களை Text ஆக மாற்றக்கூடாது
-          if (orig.id === 'quoteDate' || orig.id === 'validityDays') {
-            return;
-          }
-          
-          // Placeholder-ஐ பயன்படுத்தக் கூடாது. Type செய்த Value இருந்தால் மட்டும் எடுக்கவும்.
           const val = orig.value || ''; 
           const cs = window.getComputedStyle(orig);
           
@@ -1113,7 +1107,6 @@ async function shareWhatsApp(evt) {
             clone.parentNode.replaceChild(span, clone);
           }
         });
-        
         clonedSheet.querySelectorAll('.no-print, .row-del').forEach(el => el.remove());
       }
     });
@@ -1131,9 +1124,7 @@ async function shareWhatsApp(evt) {
       for (const rb of rowBoundaries) {
         const topPx = rb.top * pxScale;
         const bottomPx = rb.bottom * pxScale;
-        if (topPx < safe && bottomPx > safe && topPx > prevBreakPx) {
-          safe = topPx;
-        }
+        if (topPx < safe && bottomPx > safe && topPx > prevBreakPx) safe = topPx;
       }
       return safe;
     }
@@ -1173,32 +1164,32 @@ async function shareWhatsApp(evt) {
     const pdfBlob = pdf.output('blob');
     const pdfFile = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-    // WhatsApp Integration Logic
-    if (navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    // Try Native Sharing First
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
       await navigator.share({
         files: [pdfFile],
-        title: 'Quotation - ' + (document.getElementById('toName').value || ''),
+        title: 'Quotation',
         text: 'Quotation from Krishna Industrial Services'
       });
     } else {
+      // Fallback: Download & Redirect
       pdf.save(fileName);
       let phone = (document.getElementById('toPhone').value || '').replace(/\D/g, '');
       if (phone && phone.length === 10) phone = '91' + phone;
-      const msg = encodeURIComponent('Quotation PDF downloaded as "' + fileName + '" — please attach it here from your Downloads folder.');
+      const msg = encodeURIComponent('Quotation generated: ' + fileName);
       const url = phone ? `https://wa.me/${phone}?text=${msg}` : `https://wa.me/?text=${msg}`;
-      alert('PDF டவுன்லோட் ஆகிவிட்டது. இப்போது வாட்ஸ்அப் திறக்கப்படும். 📎 பட்டனை அழுத்தி, "Documents" என்பதற்குச் சென்று, இப்போது டவுன்லோட் ஆன PDF-ஐத் தேர்வு செய்து அனுப்புங்கள்.');
+      alert('PDF டவுன்லோட் ஆகிறது. வாட்ஸ்அப் திறந்ததும் டாக்குமெண்ட்டை அட்டாச் செய்யவும்.');
       window.open(url, '_blank');
     }
+
   } catch (err) {
-    alert('Could not generate PDF for sharing: ' + err.message);
+    alert('Could not generate PDF: ' + err.message);
   } finally {
     document.body.classList.remove('pdf-compact');
-    
     document.body.style.width = origBodyWidth;
     sheet.style.width = origSheetWidth;
     sheet.style.maxWidth = origSheetMaxWidth;
     sheet.style.padding = origSheetPadding;
-    
     btn.textContent = originalText;
     btn.disabled = false;
   }
