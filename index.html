@@ -400,66 +400,54 @@
     .history-panel, .sheet, .dashboard-panel { max-width: 100%; }
   }
 
- @media print {
+ /* Print மற்றும் PDF export ஆகிய இரண்டிற்கும் பொதுவான மற்றும் கட்டாயமான மாற்றங்கள் */
+  @media print {
     body { background: white; padding: 0; margin: 0; }
     .toolbar, .history-panel, .dashboard-panel { display: none !important; }
-    .sheet { box-shadow: none; padding: 0; max-width: 100%; width: 100% !important; }
-    .row-del, .no-print, th.no-print, td.no-print { display: none !important; }
-
-    /* MAGIC FIX: டேபிளுக்குக் கீழே பெரிய இடைவெளி வருவதைத் தடுக்கும் குறியீடு */
+    
+    .sheet { 
+        box-shadow: none !important; 
+        padding: 0 !important; 
+        max-width: 100% !important; 
+        width: 100% !important; 
+        margin: 0 !important;
+    }
+    
+    /* டேபிள் தானாக அலைன் ஆக இது கட்டாயம் */
     table#itemsTable { 
-      display: table !important; 
-      overflow: visible !important; 
-      white-space: normal !important; 
+        display: table !important; 
+        width: 100% !important; 
+        border-collapse: collapse !important;
+        table-layout: fixed !important; 
+    }
+    table#itemsTable th, table#itemsTable td { 
+        display: table-cell !important; 
+        border: 1px solid #ccc !important;
+        padding: 8px !important;
+    }
+
+    .no-print, .row-del, th.no-print, td.no-print { display: none !important; }
+
+    /* footerblock மற்றும் summary table ஒன்றிணைந்து இருக்க */
+    .footer-block { display: block !important; page-break-inside: avoid !important; }
+    .summary-table { width: 300px !important; margin-left: auto !important; margin-right: 0 !important; }
+    
+    input, textarea { border: none !important; background: transparent !important; }
+    #quoteDate { display: none !important; }
+    .date-print-only { display: inline-block !important; }
+  }
+
+  /* PDF-க்கான Compact Mode இதையும் மாற்றவும் */
+  body.pdf-compact .sheet { 
       width: 100% !important; 
-    }
-    table#itemsTable thead { display: table-header-group !important; width: auto !important; }
-    table#itemsTable tbody { display: table-row-group !important; width: auto !important; }
-
-    table { page-break-inside: auto; border-collapse: collapse; }
-    thead { display: table-header-group; }
-    tfoot { display: table-footer-group; }
-    tr { page-break-inside: avoid; page-break-after: auto; }
-
-    .header { page-break-after: avoid; }
-    .quotation-title, .meta-row, .subject-row, .intro-text { page-break-inside: avoid; }
-    .signature { page-break-inside: avoid; }
-    
-    /* Footer பகுதியை சரியாக முதல் பக்கத்திலேயே டேபிளுக்குக் கீழே கொண்டுவர */
-    .footer-block { page-break-inside: avoid !important; break-inside: avoid !important; margin-top: 15px; display: block; }
-    .summary-table { page-break-inside: avoid !important; }
-    
-    p { orphans: 3; widows: 3; }
-
-    input, textarea {
-      border: none !important;
-      background: transparent !important;
-      outline: none !important;
-      resize: none !important;
-      color: #000 !important;
-      padding: 0 !important;
-      pointer-events: none;
-    }
-    
-    input::placeholder, textarea::placeholder { color: transparent !important; }
-    
-    textarea {
-      white-space: pre-wrap;
-      overflow: visible;
-      height: auto !important;
-      font-family: inherit;
-    }
-    
-    input[type="date"], #quoteDate, #validityDays { display: none !important; }
-    
-    .date-print-only { display: inline-block !important; font-size: 14px; color: #000; }
-    .validity-print-only { display: inline-block !important; }
-    .validity-edit { display: none !important; }
-    #tableTitle { font-weight: 600 !important; }
-    #subject { font-weight: bold !important; }
-    .summary-table .sval input { border: none !important; }
-    tr.category-row td { background: var(--theme-color) !important; color: white !important; }
-    tr.category-row input { color: white !important; }
+      max-width: 100% !important; 
+      padding: 20px !important;
+      box-shadow: none !important;
+  }
+  body.pdf-compact table#itemsTable { 
+      display: table !important; 
+      width: 100% !important; 
+      table-layout: fixed !important; 
   }
 </style>
 </head>
