@@ -1050,15 +1050,14 @@ function duplicateQuotation() {
 // Builds the quotation PDF and returns { pdf, pdfBlob, pdfFile, fileName }.
 // Shared by the "Generate PDF" and "Share WhatsApp" buttons so the
 // html2canvas/jsPDF logic only lives in one place.
+// Builds the quotation PDF and returns { pdf, pdfBlob, pdfFile, fileName }.
 async function buildQuotationPDF() {
   document.body.classList.add('pdf-compact');
   try {
     const sheet = document.getElementById('sheet');
     await new Promise(r => setTimeout(r, 50));
 
-    // Record every table row's top/bottom position (relative to the sheet) BEFORE
-    // rasterizing, so we can later make sure no page-break line falls in the middle
-    // of a row (this is what was causing rows to look "cut in half" in the PDF).
+    // Record every table row's top/bottom position
     const sheetRectPre = sheet.getBoundingClientRect();
     const rowBoundaries = Array.from(sheet.querySelectorAll('table tr')).map(el => {
       const r = el.getBoundingClientRect();
@@ -1070,15 +1069,7 @@ async function buildQuotationPDF() {
       scale: 2,
       useCORS: true,
       backgroundColor: '#ffffff',
-      windowWidth: 1024, // Added to fix mobile table shrinking issue
-      // html2canvas clones the whole document to rasterize it, and cloneNode()
-      // only copies the *attribute* value of <input>/<textarea> elements, not
-      // their live, currently-typed .value property. That's what was causing
-      // Description/Qty/Unit/Rate/GST (and anything else typed after page
-      // load) to render blank in the exported PDF even though the totals
-      // calculated from those same values were correct. Fix: walk the
-      // original and cloned elements in the same DOM order and replace each
-      // cloned form control with a plain text element holding the real value.
+      windowWidth: 1024, // Fixes mobile table shrinking
       onclone: (clonedDoc, clonedSheet) => {
         const originals = sheet.querySelectorAll('input, textarea');
         const clones = clonedSheet.querySelectorAll('input, textarea');
@@ -1086,32 +1077,34 @@ async function buildQuotationPDF() {
           const clone = clones[i];
           if (!clone || !clone.parentNode) return;
           const cs = window.getComputedStyle(orig);
-          const isTextarea = orig.tagName === 'TEXTAREA';
-          const span = clonedDoc.createElement(isTextarea ? 'div' : 'span');
-          span.textContent = orig.value;
-          span.style.cssText =
-            'display:' + (isTextarea ? 'block' : 'inline-block') + ';' +
-            'width: 100%;' + // Changed from fixed offsetWidth to 100%
-            'min-height:' + orig.offsetHeight + 'px;' +
+          
+          // Changed to 'div' instead of 'span' to avoid table baseline breaking
+          const divElement = clonedDoc.createElement('div');
+          divElement.textContent = orig.value;
+          
+          divElement.style.cssText =
+            'display: block;' + // Forced block layout for perfect table cell fit
+            'width: 100%;' +
             'font-size:' + cs.fontSize + ';' +
             'font-family:' + cs.fontFamily + ';' +
             'font-weight:' + cs.fontWeight + ';' +
             'line-height:' + cs.lineHeight + ';' +
             'color:' + cs.color + ';' +
             'text-align:' + cs.textAlign + ';' +
-            'white-space: normal;' + // Changed from nowrap to normal
-            'word-break: break-word;' + // Added to prevent overflow
-            'vertical-align:middle;' +
-            'box-sizing:border-box;' +
+            'white-space: pre-wrap;' + // Preserves spaces and wraps text properly
+            'word-wrap: break-word;' + 
+            'box-sizing: border-box;' +
             'padding:' + cs.padding + ';';
-          clone.parentNode.replaceChild(span, clone);
+            
+          clone.parentNode.replaceChild(divElement, clone);
         });
-        // Strip anything on-screen-only (delete-row ✖ buttons, add-row
-        // buttons, etc.) from the clone so it never shows up in the PDF.
+        
+        // Remove on-screen only elements
         clonedSheet.querySelectorAll('.no-print, .row-del').forEach(el => el.remove());
       }
     });
-    const pxScale = canvas.width / sheetWidthPx; // canvas pixels per CSS pixel
+    
+    const pxScale = canvas.width / sheetWidthPx;
 
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -1120,8 +1113,6 @@ async function buildQuotationPDF() {
     const mmPerCanvasPx = pageWidthMm / canvas.width;
     const pageHeightCanvasPx = pageHeightMm / mmPerCanvasPx;
 
-    // Given an ideal break point, nudge it up (never down, so nothing overlaps)
-    // to just above any row it would otherwise slice through.
     function findSafeBreak(idealBreakPx, prevBreakPx) {
       let safe = idealBreakPx;
       for (const rb of rowBoundaries) {
@@ -1134,20 +1125,16 @@ async function buildQuotationPDF() {
       return safe;
     }
 
-    // Compute break points for every page so each page ends in a gap between rows.
     const breaks = [0];
     let cursor = 0;
     while (cursor < canvas.height - 1) {
       let next = Math.min(cursor + pageHeightCanvasPx, canvas.height);
       if (next < canvas.height) next = findSafeBreak(next, cursor);
-      if (next <= cursor) next = Math.min(cursor + pageHeightCanvasPx, canvas.height); // safety fallback
+      if (next <= cursor) next = Math.min(cursor + pageHeightCanvasPx, canvas.height);
       breaks.push(next);
       cursor = next;
     }
 
-    // Slice the big canvas into per-page canvases using the safe break points,
-    // so every page gets a clean, un-split image instead of one long image
-    // repositioned with a negative offset (which is what caused the cut rows).
     for (let i = 0; i < breaks.length - 1; i++) {
       const startPx = breaks[i];
       const endPx = breaks[i + 1];
@@ -2547,7 +2534,9 @@ document.addEventListener('click', (e) => {
     hideDescSuggestions();
   }
 });
-window.addEventListener('resize', hideDescSuggestions);
+window.addEventListener('resize', () => { 
+  if (acActiveInput) positionAcBox(acActiveInput); 
+});
 window.addEventListener('scroll', () => { if (acActiveInput) positionAcBox(acActiveInput); }, true);
 
 // ---------- Customer Database ----------
