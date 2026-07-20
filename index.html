@@ -17,6 +17,7 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
   :root {
@@ -137,6 +138,22 @@
     padding: 40px;
     box-shadow: 0 0 12px rgba(0,0,0,0.15);
   }
+  .bottom-actions {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px dashed #ccc;
+  }
+  .bottom-actions button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+  }
   .header {
     text-align: center;
     border-bottom: 3px solid var(--theme-color);
@@ -168,13 +185,18 @@
     color: #555;
     margin-top: 2px;
   }
-  .PROFORMA INVOICE-title {
+  .proforma-title {
     text-align: center;
-    font-size: 20px;
-    font-weight: bold;
-    text-decoration: underline;
-    margin: 20px 0;
-    color: var(--theme-color);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin: 20px auto;
+    padding: 10px 28px;
+    color: #ffffff;
+    background: linear-gradient(135deg, var(--theme-color), #2f8f8f);
+    border-radius: 8px;
+    width: fit-content;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
   }
   .quote-no-row { margin-top: -15px; }
   .meta-row {
@@ -314,6 +336,33 @@
     font-weight: bold;
     margin-top: 30px;
   }
+  .bank-details {
+    margin-top: 20px;
+    padding: 12px 16px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: var(--theme-color-light);
+    max-width: 320px;
+  }
+  .bank-title {
+    font-weight: 700;
+    color: var(--theme-color);
+    margin-bottom: 6px;
+    font-size: 14px;
+  }
+  .bank-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    font-size: 13px;
+    padding: 2px 0;
+  }
+  .bank-row span:first-child {
+    color: #555;
+  }
+  .bank-row span:last-child {
+    font-weight: 600;
+  }
   .footer-block {
     page-break-inside: avoid;
     break-inside: avoid;
@@ -332,7 +381,7 @@
   body.pdf-compact .header .place,
   body.pdf-compact .header .contact { font-size: 9px !important; margin-top: 1px !important; }
   body.pdf-compact .header { padding-bottom: 5px !important; margin-bottom: 8px !important; }
-  body.pdf-compact .PROFORMA INVOICE-title { margin: 6px 0 !important; font-size: 16px !important; }
+  body.pdf-compact .proforma-title { margin: 6px 0 !important; font-size: 16px !important; }
   body.pdf-compact .quote-no-row { margin-top: 2px !important; }
   body.pdf-compact .meta-row { margin-bottom: 8px !important; }
   body.pdf-compact .subject-row { margin-bottom: 6px !important; }
@@ -454,23 +503,19 @@
 <body>
 
 <div class="toolbar">
-  <button class="btn-add" onclick="addRow()">+ Add Row</button>
-  <button class="btn-category" onclick="addCategoryRow()">+ Add Category</button>
   <button class="btn-reset" onclick="resetForm()">New / Reset</button>
-  <button class="btn-dup" onclick="duplicatePROFORMA INVOICE()">🔁 Duplicate</button>
-  <button class="btn-save" onclick="savePROFORMA INVOICE()">💾 Save PROFORMA INVOICE</button>
+  <button class="btn-dup" onclick="duplicateProforma()">🔁 Duplicate</button>
   <button class="btn-history" onclick="toggleHistory()">📂 Saved (<span id="histCount">0</span>)</button>
   <button class="btn-dashboard" onclick="toggleDashboard()">📊 Dashboard</button>
   <button class="btn-customers" onclick="toggleCustomerPanel()">👥 Customers (<span id="custCount">0</span>)</button>
   <button class="btn-followup" onclick="toggleFollowupPanel()">🔔 Follow-ups (<span id="followupCount">0</span>)</button>
-  <button class="btn-export" onclick="exportCSV()">⬇ Export CSV</button>
+  <button class="btn-export" onclick="exportExcel()">⬇ Export Excel</button>
   <input type="text" id="staffName" placeholder="Your name (staff)" style="padding:8px 10px; border-radius:6px; border:none; font-size:13px; width:150px;" onchange="saveStaffName()">
   <select id="userRole" onchange="handleRoleChange()" title="Current access role" style="padding:8px 10px; border-radius:6px; border:none; font-weight:600; cursor:pointer;">
     <option value="Staff">👤 Staff</option>
     <option value="Admin">🔑 Admin</option>
   </select>
   <button class="btn-reset" onclick="changeAdminPin()" title="Change Admin PIN (Admin only)">🔐 Change PIN</button>
-  <button class="btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
   <button class="btn-whatsapp" onclick="shareWhatsApp(event)">📲 Share via WhatsApp</button>
   <button id="installBtn" class="btn-print" style="display:none;" onclick="installApp()">⬇ Install App</button>
   <select id="themeSelect" onchange="applyTheme(this.value)" style="padding:8px 10px; border-radius:6px; border:none; font-weight:600; cursor:pointer;">
@@ -523,7 +568,7 @@
     <p class="contact">GSTIN: <span id="gstinDisplay">-</span> &nbsp;|&nbsp; Phone: <span id="companyPhoneDisplay">-</span></p>
   </div>
 
-  <div class="PROFORMA INVOICE-title">PROFORMA INVOICE</div>
+  <div class="proforma-title">PROFORMA INVOICE</div>
   <div class="quote-no-row" style="text-align:center; font-size:13px; color:#555; margin-bottom:15px;">
     PROFORMA INVOICE No: <input type="text" id="quoteNumber" style="border:none; background:transparent; font-weight:600; text-align:center; width:150px; color:#555;" value="">
     <button class="no-print" onclick="generateNewNumber()" style="margin-left:8px; padding:3px 8px; font-size:11px; border:none; border-radius:4px; background:#ddd; cursor:pointer;">🔄 New No.</button>
@@ -572,13 +617,14 @@ With reference to the raw water analysis at your site, we are pleased to submit 
   <table id="itemsTable">
     <thead>
       <tr>
-        <th style="width:5%;">S.No</th>
-        <th style="width:28%;">Description</th>
-        <th style="width:9%;">Qty</th>
-        <th style="width:9%;">Unit</th>
-        <th style="width:13%;">Rate (Rs.)</th>
-        <th style="width:9%;">GST %</th>
-        <th style="width:14%;">Amount (Rs.)</th>
+        <th style="width:4%;">S.No</th>
+        <th style="width:23%;">Description</th>
+        <th style="width:8%;">Qty</th>
+        <th style="width:8%;">Unit</th>
+        <th style="width:12%;">Rate (Rs.)</th>
+        <th style="width:8%;">GST %</th>
+        <th style="width:16%;">GST Amt (Rs.)</th>
+        <th style="width:18%;">Total (Rs.)</th>
         <th class="no-print" style="width:3%;"></th>
       </tr>
     </thead>
@@ -615,6 +661,15 @@ With reference to the raw water analysis at your site, we are pleased to submit 
 
   <p style="font-size:14px; margin-top:15px;">We trust the above is in order and look forward to your valued order.</p>
 
+  <div class="bank-details">
+    <div class="bank-title">Bank Details</div>
+    <div class="bank-row"><span>Account Name</span><span>Krishna Industrial Services</span></div>
+    <div class="bank-row"><span>Bank</span><span>Indian Bank</span></div>
+    <div class="bank-row"><span>A/C No.</span><span>6230553936</span></div>
+    <div class="bank-row"><span>Branch</span><span>Gnanaolivupuram</span></div>
+    <div class="bank-row"><span>IFSC Code</span><span>IDIB000S140</span></div>
+  </div>
+
   <div class="signature">
     <p>Thanking you,</p>
     <p class="company">For Krishna Industrial Services</p>
@@ -627,6 +682,11 @@ With reference to the raw water analysis at your site, we are pleased to submit 
     <input type="text" id="gstinInput" placeholder="e.g. 33ABCDE1234F1Z5" style="padding:4px; border:1px solid #ccc; border-radius:4px; margin-right:15px;" oninput="updateCompanyInfo()">
     <label style="font-weight:600;">Company Phone: </label>
     <input type="text" id="companyPhoneInput" placeholder="e.g. 9876543210" style="padding:4px; border:1px solid #ccc; border-radius:4px;" oninput="updateCompanyInfo()">
+  </div>
+
+  <div class="no-print bottom-actions">
+    <button class="btn-save" onclick="saveProforma()">💾 Save PROFORMA INVOICE</button>
+    <button class="btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
   </div>
 </div>
 
@@ -644,7 +704,8 @@ function makeRow(desc, qty, unit, rate, gst) {
     <td><input type="text" class="unit" value="${unit||''}" placeholder="e.g. Ltr, Nos"></td>
     <td><input type="number" class="rate" value="${rate!==undefined?rate:0}" min="0" step="any" oninput="calcRow(this)"></td>
     <td><input type="number" class="gst" value="${gst!==undefined?gst:18}" min="0" step="any" oninput="calcRow(this)"></td>
-    <td class="num amount">0.00</td>
+    <td class="num gstamt">0.00</td>
+    <td class="num total">0.00</td>
     <td class="row-del no-print" onclick="removeRow(this)">✖</td>
   `;
   tbody.appendChild(tr);
@@ -660,7 +721,7 @@ function addCategoryRow(label) {
   const tr = document.createElement('tr');
   tr.className = 'category-row';
   tr.innerHTML = `
-    <td colspan="7"><input type="text" class="cat-label" value="${label||''}" placeholder="Section title e.g. Softener Plant"></td>
+    <td colspan="8"><input type="text" class="cat-label" value="${label||''}" placeholder="Section title e.g. Softener Plant"></td>
     <td class="row-del no-print" onclick="removeRow(this)">✖</td>
   `;
   tbody.appendChild(tr);
@@ -692,8 +753,10 @@ function calcRow(el) {
   const rate = parseFloat(row.querySelector('.rate').value) || 0;
   const gstPct = parseFloat(row.querySelector('.gst').value) || 0;
   const base = qty * rate;
-  const amount = base + (base * gstPct / 100);
-  row.querySelector('.amount').textContent = amount.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  const gstAmt = base * gstPct / 100;
+  const total = base + gstAmt;
+  row.querySelector('.gstamt').textContent = gstAmt.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+  row.querySelector('.total').textContent = total.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
   calcTotal();
 }
 
@@ -833,12 +896,12 @@ function loadDefaultRows() {
 // ---------- Save / Load / History ----------
 const STORAGE_KEY = 'krishna_PROFORMA INVOICEs_v2';
 
-function getSavedPROFORMA INVOICEs() {
+function getSavedProformas() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
   catch(e) { return []; }
 }
 
-function setSavedPROFORMA INVOICEs(list) {
+function setSavedProformas(list) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
 }
 
@@ -902,7 +965,7 @@ function applyFormData(data) {
 }
 
 function ensureUniqueQuoteNumber(numStr) {
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   let candidate = numStr;
   let match = /^(.*\/)(\d+)$/.exec(candidate || '');
   while (list.some(q => q.quoteNumber === candidate)) {
@@ -919,7 +982,7 @@ function ensureUniqueQuoteNumber(numStr) {
   return candidate;
 }
 
-function savePROFORMA INVOICE() {
+function saveProforma() {
   const data = collectFormData();
   if (!data.toName.trim()) {
     alert('Please enter customer name in "To" field before saving.');
@@ -934,11 +997,11 @@ function savePROFORMA INVOICE() {
   commitQuoteNumber(data.quoteNumber);
   commitRateHistory();
   commitCustomer();
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   const now = new Date().toISOString();
   const record = { id: Date.now().toString(), savedOn: new Date().toLocaleString('en-IN'), lastContact: now, orderConfirmed: false, ...data };
   list.unshift(record);
-  setSavedPROFORMA INVOICEs(list);
+  setSavedProformas(list);
   renderHistory();
   updateFollowupBadge();
   alert('PROFORMA INVOICE saved for "' + data.toName + '". Find it anytime under "Saved PROFORMA INVOICEs".');
@@ -953,19 +1016,19 @@ function commitQuoteNumber(numStr) {
   if (n > current) localStorage.setItem(QNUM_KEY, n.toString());
 }
 
-function deletePROFORMA INVOICE(id) {
+function deleteProforma(id) {
   if (!requireAdmin('Delete PROFORMA INVOICE')) return;
   if (!confirm('Delete this saved PROFORMA INVOICE? This cannot be undone.')) return;
-  let list = getSavedPROFORMA INVOICEs();
+  let list = getSavedProformas();
   list = list.filter(q => q.id !== id);
-  setSavedPROFORMA INVOICEs(list);
+  setSavedProformas(list);
   renderHistory();
   updateFollowupBadge();
   renderFollowupPanel();
 }
 
-function loadPROFORMA INVOICE(id) {
-  const list = getSavedPROFORMA INVOICEs();
+function loadProforma(id) {
+  const list = getSavedProformas();
   const record = list.find(q => q.id === id);
   if (!record) return;
   applyFormData(record);
@@ -974,7 +1037,7 @@ function loadPROFORMA INVOICE(id) {
 }
 
 function renderHistory() {
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   document.getElementById('histCount').textContent = list.length;
   const searchTerm = (document.getElementById('histSearch').value || '').toLowerCase();
   const filtered = list.filter(q => (q.toName || '').toLowerCase().includes(searchTerm));
@@ -998,8 +1061,8 @@ function renderHistory() {
         </div>
       </div>
       <div class="hist-actions">
-        <button class="hist-load" onclick="loadPROFORMA INVOICE('${q.id}')">Open</button>
-        <button class="hist-del" onclick="deletePROFORMA INVOICE('${q.id}')">Delete</button>
+        <button class="hist-load" onclick="loadProforma('${q.id}')">Open</button>
+        <button class="hist-del" onclick="deleteProforma('${q.id}')">Delete</button>
       </div>
     </div>
   `).join('');
@@ -1014,11 +1077,11 @@ function filterHistoryByCustomer(name) {
 }
 
 function toggleOrderConfirmed(id, checked) {
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   const record = list.find(q => q.id === id);
   if (!record) return;
   record.orderConfirmed = checked;
-  setSavedPROFORMA INVOICEs(list);
+  setSavedProformas(list);
   renderDashboardIfOpen();
   renderFollowupPanel();
   updateFollowupBadge();
@@ -1036,7 +1099,7 @@ function toggleHistory(forceState) {
   if (show) renderHistory();
 }
 
-function duplicatePROFORMA INVOICE() {
+function duplicateProforma() {
   if (!confirm('Duplicate this PROFORMA INVOICE as a new one? You can edit customer/date/items for the new order.')) return;
   const data = collectFormData();
   setToday();
@@ -1321,9 +1384,9 @@ function renderCustomerPanel() {
     container.innerHTML = '<div class="hist-empty">No customers found.</div>';
     return;
   }
-  const PROFORMA INVOICEs = getSavedPROFORMA INVOICEs();
+  const proformas = getSavedProformas();
   container.innerHTML = entries.map(([key, c]) => {
-    const custQuotes = PROFORMA INVOICEs.filter(q => (q.toName || '').trim().toLowerCase() === key);
+    const custQuotes = proformas.filter(q => (q.toName || '').trim().toLowerCase() === key);
     const orderCount = custQuotes.length;
     const totalValue = custQuotes.reduce((sum, q) => sum + parseAmount(q.total), 0);
     const confirmedCount = custQuotes.filter(q => q.orderConfirmed).length;
@@ -1377,7 +1440,7 @@ function deleteCustomer(key) {
 
 // ---------- Follow-up Reminders ----------
 function getPendingFollowups() {
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   const now = new Date();
   return list.filter(q => {
     if (q.orderConfirmed) return false;
@@ -1426,11 +1489,11 @@ function renderFollowupPanel() {
 }
 
 function markFollowUpDone(id) {
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   const record = list.find(q => q.id === id);
   if (!record) return;
   record.lastContact = new Date().toISOString();
-  setSavedPROFORMA INVOICEs(list);
+  setSavedProformas(list);
   renderFollowupPanel();
   updateFollowupBadge();
 }
@@ -1498,7 +1561,7 @@ function toggleDashboard(forceState) {
 }
 
 function renderDashboard() {
-  const list = getSavedPROFORMA INVOICEs();
+  const list = getSavedProformas();
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
@@ -1576,14 +1639,9 @@ function renderDashboard() {
 }
 
 // ---------- CSV Export ----------
-function csvEscape(val) {
-  const s = String(val === undefined || val === null ? '' : val);
-  return '"' + s.replace(/"/g, '""') + '"';
-}
-
-function exportCSV() {
-  if (!requireAdmin('Export CSV')) return;
-  const list = getSavedPROFORMA INVOICEs();
+function exportExcel() {
+  if (!requireAdmin('Export Excel')) return;
+  const list = getSavedProformas();
   if (list.length === 0) {
     alert('No saved PROFORMA INVOICEs to export yet.');
     return;
@@ -1593,17 +1651,12 @@ function exportCSV() {
     q.quoteNumber, q.toName, q.toPhone, q.toAddress, q.subject, q.quoteDate, q.total,
     q.orderConfirmed ? 'Yes' : 'No', q.createdBy, q.savedOn
   ]);
-  const csvLines = [headers, ...rows].map(r => r.map(csvEscape).join(','));
-  const csvContent = '\uFEFF' + csvLines.join('\r\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = 'Krishna_PROFORMA INVOICEs_' + new Date().toISOString().split('T')[0] + '.csv';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  const wsData = [headers, ...rows];
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  ws['!cols'] = headers.map(() => ({ wch: 18 }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'PROFORMA INVOICEs');
+  XLSX.writeFile(wb, 'Krishna_PROFORMA_INVOICEs_' + new Date().toISOString().split('T')[0] + '.xlsx');
 }
 
 // ---------- Keyboard Shortcuts ----------
@@ -1612,7 +1665,7 @@ document.addEventListener('keydown', function(e) {
   if (!ctrl) return;
   if (e.key === 's' || e.key === 'S') {
     e.preventDefault();
-    savePROFORMA INVOICE();
+    saveProforma();
   } else if (e.key === 'p' || e.key === 'P') {
     e.preventDefault();
     window.print();
