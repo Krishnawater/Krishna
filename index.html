@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Krishna Industrial Services - PROFORMA INVOICE Generator</title>
 
-<!-- PWA: Manifst -->
+<!-- PWA: Manifest -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#1a4d6d">
 
@@ -58,6 +58,8 @@
   .btn-whatsapp { background: #25D366; color: white; margin-left: auto; }
   .btn-customers { background: #5a8f3a; color: white; }
   .btn-export { background: #6a5a2a; color: white; }
+  .btn-backup { background: #2a5a6a; color: white; }
+  .btn-restore { background: #6a2a5a; color: white; }
   .btn-followup { background: #a8681a; color: white; }
   .followup-item { border-left: 3px solid #a8681a; padding-left: 8px; }
 
@@ -370,8 +372,34 @@
 
   @page {
     size: A4;
-    margin: 15mm 12mm;
+    margin: 10mm 12mm;
   }
+
+  /* Placeholder text (e.g. "e.g. Ltr" hint in empty Unit field) should
+     NEVER show up in the printed / PDF / WhatsApp output - it's only
+     a typing hint for the person filling the form on-screen. */
+  @media print {
+    input::placeholder, textarea::placeholder { color: transparent !important; opacity: 0 !important; }
+  }
+  body.pdf-compact input::placeholder,
+  body.pdf-compact textarea::placeholder { color: transparent !important; opacity: 0 !important; }
+
+  /* Tighten vertical spacing in compact/print mode so a normal short
+     PROFORMA INVOICE (a few item rows) fits on ONE page instead of the
+     footer block (summary + bank + signature) being pushed entirely
+     onto a near-blank second page. Long item lists will still flow
+     naturally onto page 2+. */
+  body.pdf-compact table { margin-top: 6px !important; }
+  body.pdf-compact th, body.pdf-compact td { padding: 5px 8px !important; }
+  body.pdf-compact .summary-table { margin-top: 4px !important; }
+  body.pdf-compact .summary-table td { padding: 3px 10px !important; }
+  body.pdf-compact .validity-row { margin-top: 8px !important; font-size: 12px !important; }
+  body.pdf-compact p { margin: 6px 0 !important; }
+  body.pdf-compact .bank-details { margin-top: 10px !important; padding: 8px 14px !important; }
+  body.pdf-compact .bank-row { padding: 1px 0 !important; }
+  body.pdf-compact .signature { margin-top: 18px !important; }
+  body.pdf-compact .signature .company { margin-top: 14px !important; }
+  body.pdf-compact .signature p:last-child { margin-top: 16px !important; }
 
   /* Compact header - applied to body during Print and PDF/WhatsApp export
      so the logo/header block stays small and doesn't eat up half the page */
@@ -510,6 +538,9 @@
   <button class="btn-customers" onclick="toggleCustomerPanel()">👥 Customers (<span id="custCount">0</span>)</button>
   <button class="btn-followup" onclick="toggleFollowupPanel()">🔔 Follow-ups (<span id="followupCount">0</span>)</button>
   <button class="btn-export" onclick="exportExcel()">⬇ Export Excel</button>
+  <button class="btn-backup" onclick="backupAllData()">📤 Backup</button>
+  <button class="btn-restore" onclick="document.getElementById('restoreFileInput').click()">📥 Restore</button>
+  <input type="file" id="restoreFileInput" accept="application/json" style="display:none;" onchange="restoreAllData(event)">
   <input type="text" id="staffName" placeholder="Your name (staff)" style="padding:8px 10px; border-radius:6px; border:none; font-size:13px; width:150px;" onchange="saveStaffName()">
   <select id="userRole" onchange="handleRoleChange()" title="Current access role" style="padding:8px 10px; border-radius:6px; border:none; font-weight:600; cursor:pointer;">
     <option value="Staff">👤 Staff</option>
@@ -987,6 +1018,12 @@ function saveProforma() {
   if (!data.toName.trim()) {
     alert('Please enter customer name in "To" field before saving.');
     return;
+  }
+  const phoneDigits = (data.toPhone || '').replace(/\D/g, '');
+  if (phoneDigits && phoneDigits.length !== 10) {
+    if (!confirm('Customer phone number "' + data.toPhone + '" is not a valid 10-digit number. Save anyway?')) {
+      return;
+    }
   }
   const uniqueNumber = ensureUniqueQuoteNumber(data.quoteNumber);
   if (uniqueNumber !== data.quoteNumber) {
@@ -1729,6 +1766,91 @@ function changeAdminPin() {
   alert('✅ Admin PIN updated successfully.');
 }
 
+// ---------- Backup / Restore (writes to the SAME file every time) ----------
+const BACKUP_KEYS = [
+  STORAGE_KEY,
+  CUSTOMER_DB_KEY,
+  RATE_HISTORY_KEY,
+  QNUM_KEY,
+  ADMIN_PIN_KEY,
+  USER_ROLE_KEY,
+  'krishna_company_gstin',
+  'krishna_company_phone',
+  'krishna_theme',
+  'krishna_staff_name'
+];
+const BACKUP_FILE_NAME = 'Krishna_Backup.json';
+let krishnaBackupHandle = null;
+
+async function backupAllData() {
+  if (!requireAdmin('Backup Data')) return;
+  const data = {};
+  BACKUP_KEYS.forEach(key => { data[key] = localStorage.getItem(key); });
+  const payload = { app: 'Krishna PROFORMA INVOICE', backupDate: new Date().toISOString(), data: data };
+  const jsonStr = JSON.stringify(payload, null, 2);
+
+  // Preferred: File System Access API - lets us overwrite the SAME file every time
+  if (window.showSaveFilePicker) {
+    try {
+      if (!krishnaBackupHandle) {
+        krishnaBackupHandle = await window.showSaveFilePicker({
+          suggestedName: BACKUP_FILE_NAME,
+          types: [{ description: 'JSON Backup', accept: { 'application/json': ['.json'] } }]
+        });
+      }
+      const writable = await krishnaBackupHandle.createWritable();
+      await writable.write(jsonStr);
+      await writable.close();
+      alert('✅ Backup saved to "' + krishnaBackupHandle.name + '". Next time you click Backup, it will overwrite this SAME file automatically (no new copies).');
+      return;
+    } catch (err) {
+      if (err.name === 'AbortError') return; // user cancelled the picker
+      krishnaBackupHandle = null; // fall through to plain download below
+    }
+  }
+
+  // Fallback for browsers without File System Access API (e.g. mobile Chrome/Safari)
+  const blob = new Blob([jsonStr], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = BACKUP_FILE_NAME;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  alert('✅ Backup downloaded as "' + BACKUP_FILE_NAME + '". This browser cannot overwrite the same file automatically, so please delete older copies (Krishna_Backup(1).json etc.) from your Downloads folder to avoid confusion.');
+}
+
+function restoreAllData(event) {
+  if (!requireAdmin('Restore Data')) { event.target.value = ''; return; }
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const payload = JSON.parse(e.target.result);
+      const data = payload.data || payload;
+      const dateLabel = payload.backupDate ? new Date(payload.backupDate).toLocaleString('en-IN') : 'unknown date';
+      if (!confirm('This will REPLACE all current data (saved PROFORMA INVOICEs, customers, rates, settings) with the backup from ' + dateLabel + '. Continue?')) {
+        event.target.value = '';
+        return;
+      }
+      BACKUP_KEYS.forEach(key => {
+        if (data[key] !== undefined && data[key] !== null) {
+          localStorage.setItem(key, data[key]);
+        }
+      });
+      alert('✅ Restore complete. The page will now reload.');
+      location.reload();
+    } catch (err) {
+      alert('❌ Could not read this file. Please select a valid Krishna backup JSON file.');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
 // ---------- Compact header for Print ----------
 window.addEventListener('beforeprint', () => document.body.classList.add('pdf-compact'));
 window.addEventListener('afterprint', () => document.body.classList.remove('pdf-compact'));
@@ -1737,6 +1859,15 @@ window.addEventListener('afterprint', () => document.body.classList.remove('pdf-
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').catch(err => console.log('SW registration failed:', err));
+  });
+
+  // When a new sw.js version takes control, the old cached page is gone —
+  // reload once automatically so the person always sees the latest version.
+  let refreshedOnce = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshedOnce) return;
+    refreshedOnce = true;
+    window.location.reload();
   });
 }
 
