@@ -403,17 +403,17 @@
 
   /* Compact header - applied to body during Print and PDF/WhatsApp export
      so the logo/header block stays small and doesn't eat up half the page */
-  body.pdf-compact .header img.logo-img { max-width: 110px !important; margin-bottom: 2px !important; }
-  body.pdf-compact .header h1 { font-size: 15px !important; margin: 2px 0 !important; }
-  body.pdf-compact .header .tagline { font-size: 10px !important; margin: 0 !important; }
+  body.pdf-compact .header img.logo-img { max-width: 85px !important; margin-bottom: 2px !important; }
+  body.pdf-compact .header h1 { font-size: 14px !important; margin: 2px 0 !important; }
+  body.pdf-compact .header .tagline { font-size: 9px !important; margin: 0 !important; }
   body.pdf-compact .header .place,
   body.pdf-compact .header .contact { font-size: 9px !important; margin-top: 1px !important; }
-  body.pdf-compact .header { padding-bottom: 5px !important; margin-bottom: 8px !important; }
-  body.pdf-compact .proforma-title { margin: 6px 0 !important; font-size: 16px !important; }
-  body.pdf-compact .quote-no-row { margin-top: 2px !important; }
-  body.pdf-compact .meta-row { margin-bottom: 8px !important; }
-  body.pdf-compact .subject-row { margin-bottom: 6px !important; }
-  body.pdf-compact .intro-text { margin-bottom: 8px !important; }
+  body.pdf-compact .header { padding-bottom: 4px !important; margin-bottom: 6px !important; }
+  body.pdf-compact .proforma-title { margin: 4px 0 !important; padding: 6px 20px !important; font-size: 14px !important; }
+  body.pdf-compact .quote-no-row { margin-top: 0px !important; }
+  body.pdf-compact .meta-row { margin-bottom: 6px !important; font-size: 12px !important; }
+  body.pdf-compact .subject-row { margin-bottom: 4px !important; font-size: 12px !important; }
+  body.pdf-compact .intro-text { margin-bottom: 6px !important; font-size: 12px !important; line-height: 1.3 !important; }
 
   /* ---- Make WhatsApp/PDF export (html2canvas capture) match the real
      print output: hide edit-only controls, show formatted read-only
@@ -500,8 +500,10 @@
     table#itemsTable th, table#itemsTable td { 
         display: table-cell !important; 
         border: 1px solid #ccc !important;
-        padding: 8px !important;
+        padding: 6px 8px !important;
     }
+    table#itemsTable thead { display: table-header-group !important; }
+    table#itemsTable tr { page-break-inside: avoid !important; break-inside: avoid !important; }
 
     .no-print, .row-del, th.no-print, td.no-print { display: none !important; }
 
@@ -717,7 +719,6 @@ With reference to the raw water analysis at your site, we are pleased to submit 
 
   <div class="no-print bottom-actions">
     <button class="btn-save" onclick="saveProforma()">💾 Save PROFORMA INVOICE</button>
-    <button class="btn-print" onclick="window.print()">🖨 Print / Save as PDF</button>
   </div>
 </div>
 
@@ -1145,6 +1146,30 @@ function duplicateProforma() {
   alert('Duplicated with a new PROFORMA INVOICE number. Edit customer name, date, or items as needed, then Save again.');
 }
 
+function buildContinuationHeaderElement(widthPx) {
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `position:fixed; left:-9999px; top:0; background:#fff; width:${widthPx}px; padding:0 40px; box-sizing:border-box; font-family:${window.getComputedStyle(document.body).fontFamily};`;
+
+  const theme = window.getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim() || '#1a4d6d';
+  const strip = document.createElement('div');
+  strip.style.cssText = `display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid ${theme}; padding:6px 0; margin-bottom:6px;`;
+  const quoteNo = (document.getElementById('quoteNumber').value || '').trim();
+  strip.innerHTML = `<span style="font-weight:700; font-size:13px; color:${theme};">KRISHNA INDUSTRIAL SERVICES</span><span style="font-size:11px; color:#555;">PROFORMA INVOICE No: ${quoteNo} &nbsp;|&nbsp; (Continued)</span>`;
+  wrap.appendChild(strip);
+
+  const origThead = document.getElementById('itemsTable').querySelector('thead');
+  const tableClone = document.createElement('table');
+  tableClone.style.cssText = 'width:100%; border-collapse:collapse; table-layout:fixed; margin:0;';
+  const theadClone = origThead.cloneNode(true);
+  const lastTh = theadClone.querySelector('th.no-print');
+  if (lastTh) lastTh.remove();
+  tableClone.appendChild(theadClone);
+  wrap.appendChild(tableClone);
+
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
 async function shareWhatsApp(evt) {
   const btn = evt.target;
   const originalText = btn.textContent;
@@ -1212,6 +1237,18 @@ async function shareWhatsApp(evt) {
     });
     
     const pxScale = canvas.width / sheetWidthPx;
+
+    // Build a repeatable slim header (company strip + item table column
+    // headers) that gets stamped at the top of every continuation page,
+    // so page 2+ looks like a proper document page instead of a random
+    // mid-table screenshot.
+    const contHeaderEl = buildContinuationHeaderElement(sheetWidthPx);
+    await new Promise(r => setTimeout(r, 30));
+    const contHeaderCanvas = await html2canvas(contHeaderEl, {
+      scale: 2, backgroundColor: '#ffffff', windowWidth: 1024
+    });
+    document.body.removeChild(contHeaderEl);
+
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidthMm = pdf.internal.pageSize.getWidth();
@@ -1231,12 +1268,15 @@ async function shareWhatsApp(evt) {
 
     const breaks = [0];
     let cursor = 0;
+    let pageIdx = 0;
     while (cursor < canvas.height - 1) {
-      let next = Math.min(cursor + pageHeightCanvasPx, canvas.height);
+      const availablePx = pageIdx === 0 ? pageHeightCanvasPx : (pageHeightCanvasPx - contHeaderCanvas.height);
+      let next = Math.min(cursor + availablePx, canvas.height);
       if (next < canvas.height) next = findSafeBreak(next, cursor);
-      if (next <= cursor) next = Math.min(cursor + pageHeightCanvasPx, canvas.height);
+      if (next <= cursor) next = Math.min(cursor + availablePx, canvas.height);
       breaks.push(next);
       cursor = next;
+      pageIdx++;
     }
 
     for (let i = 0; i < breaks.length - 1; i++) {
@@ -1245,18 +1285,24 @@ async function shareWhatsApp(evt) {
       const sliceHeightPx = Math.round(endPx - startPx);
       if (sliceHeightPx <= 0) continue;
 
+      const isContinuation = i > 0;
+      const headerHeightPx = isContinuation ? contHeaderCanvas.height : 0;
+
       const pageCanvas = document.createElement('canvas');
       pageCanvas.width = canvas.width;
-      pageCanvas.height = sliceHeightPx;
+      pageCanvas.height = sliceHeightPx + headerHeightPx;
       const ctx = pageCanvas.getContext('2d');
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-      ctx.drawImage(canvas, 0, startPx, canvas.width, sliceHeightPx, 0, 0, canvas.width, sliceHeightPx);
+      if (isContinuation) {
+        ctx.drawImage(contHeaderCanvas, 0, 0);
+      }
+      ctx.drawImage(canvas, 0, startPx, canvas.width, sliceHeightPx, 0, headerHeightPx, canvas.width, sliceHeightPx);
       const pageImgData = pageCanvas.toDataURL('image/jpeg', 0.95);
 
       if (i > 0) pdf.addPage();
-      const sliceHeightMm = sliceHeightPx * mmPerCanvasPx;
-      pdf.addImage(pageImgData, 'JPEG', 0, 0, pageWidthMm, sliceHeightMm);
+      const pageImgHeightMm = pageCanvas.height * mmPerCanvasPx;
+      pdf.addImage(pageImgData, 'JPEG', 0, 0, pageWidthMm, pageImgHeightMm);
     }
 
     const custName = (document.getElementById('toName').value || 'PROFORMA INVOICE').replace(/[^a-z0-9]/gi, '_');
@@ -1703,9 +1749,6 @@ document.addEventListener('keydown', function(e) {
   if (e.key === 's' || e.key === 'S') {
     e.preventDefault();
     saveProforma();
-  } else if (e.key === 'p' || e.key === 'P') {
-    e.preventDefault();
-    window.print();
   } else if (e.key === 'n' || e.key === 'N') {
     e.preventDefault();
     resetForm();
@@ -1850,10 +1893,6 @@ function restoreAllData(event) {
   };
   reader.readAsText(file);
 }
-
-// ---------- Compact header for Print ----------
-window.addEventListener('beforeprint', () => document.body.classList.add('pdf-compact'));
-window.addEventListener('afterprint', () => document.body.classList.remove('pdf-compact'));
 
 // ---------- PWA: Service Worker + Install ----------
 if ('serviceWorker' in navigator) {
